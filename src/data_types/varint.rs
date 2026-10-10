@@ -1,6 +1,4 @@
-use std::io::{self, BufRead, Cursor, Seek, SeekFrom, Write};
-
-use thiserror::Error;
+use std::io::{self, BufRead, Cursor, Read, Write};
 
 /// The 7 least significant bits are used to encode the value and
 /// the most significant bit indicates whether there's another byte
@@ -43,19 +41,11 @@ use thiserror::Error;
 /// # References
 /// <https://minecraft.wiki/w/Java_Edition_protocol/Packets#VarInt_and_VarLong>
 /// <https://protobuf.dev/programming-guides/encoding/#varints>
-pub type VarInt = i32;
-
-#[derive(Error, Debug)]
-pub enum VarIntWriteError {
-    #[error("write buffer to small")]
-    BufferTooSmall,
-}
-
 const MAX_VARINT_LENGTH: usize = 5;
 
 /// Reads a sequence of bytes and returns a signed 32-bit VarInt
 /// The cursor parameter
-pub fn read_var_int(bytes: &mut Cursor<&[u8]>) -> VarInt {
+pub fn read_var_int(bytes: &mut Cursor<&[u8]>) -> i32 {
     let mut val: i32 = 0;
 
     for i in 0..MAX_VARINT_LENGTH {

@@ -1,3 +1,4 @@
+pub mod string;
 pub mod varint;
 
 #[derive(Debug)]

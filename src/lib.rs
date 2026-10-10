@@ -1,16 +1,10 @@
 mod data_types;
 
-use std::{
-    fmt::Debug,
-    io::{self, Cursor},
-};
+use std::{fmt::Debug, io::Cursor};
 
 use thiserror::Error;
 
-use crate::data_types::{
-    UShort,
-    varint::{VarInt, read_var_int},
-};
+use crate::data_types::{UShort, string::read_string, varint::read_var_int};
 
 pub const PROTOCOL_VERSION: i32 = 777;
 
@@ -67,7 +61,10 @@ struct DecodeError;
 
 #[derive(Error, Debug)]
 #[error("error processing incoming packets")]
-struct PacketProcessingError;
+enum PacketProcessingError {
+    #[error("failed to process strings")]
+    InvalidUTF8(#[from] std::str::Utf8Error),
+}
 
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,10 +78,10 @@ enum PacketServerPlay {}
 
 #[derive(Debug, PartialEq)]
 struct PacketServerHandshake {
-    protocol_version: VarInt,
+    protocol_version: i32,
     server_address: String,
     server_port: UShort,
-    intent: VarInt,
+    intent: i32,
 }
 
 impl Packet for PacketServerHandshake {
@@ -123,15 +120,16 @@ fn process_handshake_packet(
     println!("cursor pos: {}", cursor.position());
     let protocol_version = read_var_int(&mut cursor);
     println!("cursor pos: {}", cursor.position());
-    let string_length = read_var_int(&mut cursor);
+    let strlen_in_bytes = read_var_int(&mut cursor);
     println!("cursor pos: {}", cursor.position());
+    println!("total bytes for string: {strlen_in_bytes}");
 
-    let num_bytes_for_string = string_length * 4;
-    println!("total bytes for string: {num_bytes_for_string}");
+    let server_address = read_string(&mut cursor, strlen_in_bytes as usize)?;
+    println!("cursor pos: {}", cursor.position());
 
     Ok(PacketServerHandshake {
         protocol_version,
-        server_address: String::from("nothing yet"),
+        server_address: String::from(server_address),
         server_port: UShort(0),
         intent: 0,
     })
@@ -154,10 +152,10 @@ mod tests {
 
     #[test]
     fn packet_handshake_server_should_be_processed() -> Result<(), Box<dyn std::error::Error>> {
-        let protocol_version = VarInt::from(PROTOCOL_VERSION);
+        let protocol_version = PROTOCOL_VERSION;
         let server_address = String::from("mc.somewhere.com");
         let server_port = UShort(25565);
-        let intent = VarInt::from(0x01);
+        let intent = 0x01;
 
         let mut packets: Vec<u8> = Vec::new();
         write_var_int(PROTOCOL_VERSION, &mut packets)?;
