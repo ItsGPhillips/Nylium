@@ -1,5 +1,41 @@
+use std::io::{self, Cursor, Read};
+
 pub mod string;
 pub mod varint;
+
+macro_rules! create_cursor_header {
+    ($($name:ident => $ty:ty),+ $(,)?) => {
+        $(
+            #[allow(unused)]
+            pub fn $name(cursor: &mut Cursor<&[u8]>) -> io::Result<$ty> {
+                let mut buf = [0u8; std::mem::size_of::<$ty>()];
+                cursor.read_exact(&mut buf)?;
+
+                Ok(<$ty>::from_be_bytes(buf))
+            }
+        )+
+    };
+}
+
+create_cursor_header! {
+    read_u8_byte_be => u8,
+    read_u16_short_be => u16,
+    read_u32_be => u32,
+    read_u64_be => u64,
+    read_u128_be => u128,
+
+    read_i8_byte_be => i8,
+    read_i16_short_be => i16,
+    read_i32_int_be => i32,
+    read_i64_long_be => i64,
+    read_i128_long_long_be => i128,
+
+    read_f32_float_be => f32,
+    read_f64_double_be => f64,
+
+    read_usize_be => usize,
+    read_isize_be => isize,
+}
 
 #[derive(Debug)]
 pub struct Byte(pub i8); // 1 byte
@@ -7,11 +43,9 @@ pub struct Byte(pub i8); // 1 byte
 #[derive(Debug)]
 pub struct UByte(pub u8); // 1 byte
 
-#[derive(Debug)]
-pub struct Short(pub i16); // 2 bytes
+pub type Short = i16; // 2 bytes
 
-#[derive(Debug, PartialEq)]
-pub struct UShort(pub u16); // 2 bytes
+pub type UShort = u16; // 2 bytes
 
 #[derive(Debug)]
 pub struct Int(pub i32); // 4 bytes

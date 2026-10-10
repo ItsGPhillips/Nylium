@@ -1,10 +1,13 @@
 mod data_types;
 
-use std::{fmt::Debug, io::Cursor};
+use std::{
+    fmt::Debug,
+    io::{self, Cursor},
+};
 
 use thiserror::Error;
 
-use crate::data_types::{UShort, string::read_string, varint::read_var_int};
+use crate::data_types::{UShort, read_u16_short_be, string::read_string, varint::read_var_int};
 
 pub const PROTOCOL_VERSION: i32 = 777;
 
@@ -64,6 +67,7 @@ struct DecodeError;
 enum PacketProcessingError {
     #[error("failed to process strings")]
     InvalidUTF8(#[from] std::str::Utf8Error),
+    Io(#[from] io::Error),
 }
 
 impl std::fmt::Display for DecodeError {
@@ -126,18 +130,20 @@ fn process_handshake_packet(
 
     let server_address = read_string(&mut cursor, strlen_in_bytes as usize)?;
     println!("cursor pos: {}", cursor.position());
+    let server_port = read_u16_short_be(&mut cursor)?;
+    println!("cursor pos: {}", cursor.position());
 
     Ok(PacketServerHandshake {
         protocol_version,
         server_address: String::from(server_address),
-        server_port: UShort(0),
+        server_port,
         intent: 0,
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, io::Write};
+    use std::io::Write;
 
     use crate::data_types::varint::write_var_int;
 
@@ -152,10 +158,10 @@ mod tests {
 
     #[test]
     fn packet_handshake_server_should_be_processed() -> Result<(), Box<dyn std::error::Error>> {
-        let protocol_version = PROTOCOL_VERSION;
+        let protocol_version: i32 = PROTOCOL_VERSION;
         let server_address = String::from("mc.somewhere.com");
-        let server_port = UShort(25565);
-        let intent = 0x01;
+        let server_port: u16 = 25565;
+        let intent: i32 = 0x01;
 
         let mut packets: Vec<u8> = Vec::new();
         write_var_int(PROTOCOL_VERSION, &mut packets)?;
@@ -164,7 +170,7 @@ mod tests {
         write_var_int(i32::try_from(server_address.len())?, &mut packets)?;
         packets.write_all(server_address.as_bytes())?;
 
-        packets.write_all(&server_port.0.to_be_bytes())?;
+        packets.write_all(&server_port.to_be_bytes())?;
         write_var_int(intent, &mut packets)?;
 
         let actual = process_handshake_packet(&packets).unwrap();
