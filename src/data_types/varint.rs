@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, Cursor, Read, Write};
+use std::io::{self, BufRead, Cursor, Write};
 
 /// The 7 least significant bits are used to encode the value and
 /// the most significant bit indicates whether there's another byte

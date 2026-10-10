@@ -7,11 +7,13 @@ use std::{
 
 use thiserror::Error;
 
-use crate::data_types::{UShort, read_u16_short_be, string::read_string, varint::read_var_int};
+use crate::data_types::{
+    RequestIntent, UShort, read_u16_short_be, string::read_string, varint::read_var_int,
+};
 
 pub const PROTOCOL_VERSION: i32 = 777;
 
-enum ServerState {
+enum ProtocolState {
     Handshaking,
     Status,
     Login,
@@ -64,10 +66,12 @@ struct DecodeError;
 
 #[derive(Error, Debug)]
 #[error("error processing incoming packets")]
-enum PacketProcessingError {
+pub enum PacketProcessingError {
     #[error("failed to process strings")]
     InvalidUTF8(#[from] std::str::Utf8Error),
     Io(#[from] io::Error),
+    #[error("failed to process intent from request")]
+    InvalidIntent,
 }
 
 impl std::fmt::Display for DecodeError {
@@ -85,7 +89,7 @@ struct PacketServerHandshake {
     protocol_version: i32,
     server_address: String,
     server_port: UShort,
-    intent: i32,
+    intent: RequestIntent,
 }
 
 impl Packet for PacketServerHandshake {
@@ -101,16 +105,16 @@ type PacketID = i16;
 // TODO: extract handshake packet ID, then parse payload into intermediate data types
 fn process_incoming_packets(
     packets: &[u8],
-    state: ServerState,
+    state: ProtocolState,
 ) -> Result<impl Packet + Debug, PacketProcessingError> {
     match state {
-        ServerState::Handshaking => {
+        ProtocolState::Handshaking => {
             let packet = process_handshake_packet(&packets);
         }
-        ServerState::Status => {}
-        ServerState::Login => {}
-        ServerState::Configuration => {}
-        ServerState::Play => {}
+        ProtocolState::Status => {}
+        ProtocolState::Login => {}
+        ProtocolState::Configuration => {}
+        ProtocolState::Play => {}
     }
 
     Ok(todo!() as PacketServerHandshake)
@@ -121,23 +125,18 @@ fn process_handshake_packet(
 ) -> Result<PacketServerHandshake, PacketProcessingError> {
     let mut cursor = Cursor::new(packets);
 
-    println!("cursor pos: {}", cursor.position());
     let protocol_version = read_var_int(&mut cursor);
-    println!("cursor pos: {}", cursor.position());
     let strlen_in_bytes = read_var_int(&mut cursor);
-    println!("cursor pos: {}", cursor.position());
-    println!("total bytes for string: {strlen_in_bytes}");
-
     let server_address = read_string(&mut cursor, strlen_in_bytes as usize)?;
-    println!("cursor pos: {}", cursor.position());
     let server_port = read_u16_short_be(&mut cursor)?;
-    println!("cursor pos: {}", cursor.position());
+    let intent = read_var_int(&mut cursor);
+    let intent = RequestIntent::try_from(intent)?;
 
     Ok(PacketServerHandshake {
         protocol_version,
         server_address: String::from(server_address),
         server_port,
-        intent: 0,
+        intent,
     })
 }
 
@@ -158,7 +157,6 @@ mod tests {
 
     #[test]
     fn packet_handshake_server_should_be_processed() -> Result<(), Box<dyn std::error::Error>> {
-        let protocol_version: i32 = PROTOCOL_VERSION;
         let server_address = String::from("mc.somewhere.com");
         let server_port: u16 = 25565;
         let intent: i32 = 0x01;
@@ -175,10 +173,10 @@ mod tests {
 
         let actual = process_handshake_packet(&packets).unwrap();
         let expected = PacketServerHandshake {
-            protocol_version,
+            protocol_version: 777,
             server_address,
-            server_port,
-            intent,
+            server_port: 25565,
+            intent: RequestIntent::Status,
         };
 
         assert_eq!(actual, expected);
