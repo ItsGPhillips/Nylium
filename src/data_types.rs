@@ -1,6 +1,6 @@
 use std::io::{self, Cursor, Read};
 
-use crate::PacketProcessingError;
+use crate::packets::PacketProcessingError;
 
 pub mod string;
 pub mod varint;
