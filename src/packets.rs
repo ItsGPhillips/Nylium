@@ -12,7 +12,7 @@ use crate::data_types::{
 pub const PROTOCOL_VERSION: i32 = 777;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-enum ProtocolState {
+pub enum ProtocolState {
     Handshaking,
     Status,
     Login,
@@ -21,7 +21,7 @@ enum ProtocolState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PacketDirection {
+pub enum PacketDirection {
     Serverbound, // client -> server
     Clientbound, // server -> client
 }
@@ -91,21 +91,17 @@ struct PacketServerHandshake {
     intent: ClientIntent,
 }
 
-impl Packet for PacketServerHandshake {
-    const OFFICIAL_NAME: &'static str = "intention";
-}
-
-fn official_name<P: Packet>() -> &'static str {
-    P::OFFICIAL_NAME
-}
+/// The status can only be requested once, immediately after the
+/// handshake, before any ping. The server won't respond otherwise.
+///
+/// `packet_id`: 0x0
+/// TODO: idempotency on network side? server doesn't respond unless packet is received, before any ping
+struct PacketServerStatusRequest;
 
 type PacketID = i16;
 
 // TODO: extract handshake packet ID, then parse payload into intermediate data types
-fn process_incoming_packets(
-    packets: &[u8],
-    state: ProtocolState,
-) -> Result<impl Packet + Debug, PacketProcessingError> {
+fn process_packet_id(byte: u8, state: ProtocolState) -> Result<(), PacketProcessingError> {
     match state {
         ProtocolState::Handshaking => {
             // let packet = process_handshake_packet(&packets);
@@ -115,8 +111,7 @@ fn process_incoming_packets(
         ProtocolState::Configuration => {}
         ProtocolState::Play => {}
     }
-
-    Ok(todo!() as PacketServerHandshake)
+    Ok(())
 }
 
 #[derive(Debug, PartialEq)]
@@ -160,6 +155,8 @@ fn process_handshake_packet(
         intent,
     })
 }
+
+fn process_status_request_packet() {}
 
 #[cfg(test)]
 mod tests {
@@ -215,5 +212,25 @@ mod tests {
         assert_eq!(actual, expected);
         assert_eq!(actual_conn, expected_conn);
         Ok(())
+    }
+
+    #[test]
+    fn packet_status_server_should_be_processed() {
+        let connection = ConnectionState {
+            server_state: ProtocolState::Status,
+            client_intent: Some(ClientIntent::Status),
+        };
+
+        let mut has_status_request = false;
+
+        // let actual = process_status_request_packet(&mut has_status_request);
+
+        // CASE 1: not yet requested but has STATUS request -> accept, send STATUS response
+
+        // CASE 2: has been requested, but same STATUS request -> ignore, don't send STATUS response
+
+        // CASE 3: has been requested, then incoming PING request -> accept, send PONG response
+
+        // CASE 4: has not been requested, but incoming PING request -> don't respond
     }
 }
