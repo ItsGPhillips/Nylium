@@ -64,22 +64,22 @@ pub struct Double(pub f64); // 8 bytes
 #[derive(Debug)]
 pub struct VarLong(pub i64);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 #[repr(i32)]
-pub enum RequestIntent {
+pub enum ClientIntent {
     Status = 1,
     Login = 2,
     Transfer = 3,
 }
 
-impl TryFrom<i32> for RequestIntent {
+impl TryFrom<i32> for ClientIntent {
     type Error = PacketProcessingError;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(RequestIntent::Status),
-            2 => Ok(RequestIntent::Login),
-            3 => Ok(RequestIntent::Transfer),
+            1 => Ok(ClientIntent::Status),
+            2 => Ok(ClientIntent::Login),
+            3 => Ok(ClientIntent::Transfer),
             _ => Err(PacketProcessingError::InvalidIntent),
         }
     }

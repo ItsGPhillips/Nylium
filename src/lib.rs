@@ -8,11 +8,12 @@ use std::{
 use thiserror::Error;
 
 use crate::data_types::{
-    RequestIntent, UShort, read_u16_short_be, string::read_string, varint::read_var_int,
+    ClientIntent, UShort, read_u16_short_be, string::read_string, varint::read_var_int,
 };
 
 pub const PROTOCOL_VERSION: i32 = 777;
 
+#[derive(Debug, PartialEq, Copy, Clone)]
 enum ProtocolState {
     Handshaking,
     Status,
@@ -89,7 +90,7 @@ struct PacketServerHandshake {
     protocol_version: i32,
     server_address: String,
     server_port: UShort,
-    intent: RequestIntent,
+    intent: ClientIntent,
 }
 
 impl Packet for PacketServerHandshake {
@@ -109,7 +110,7 @@ fn process_incoming_packets(
 ) -> Result<impl Packet + Debug, PacketProcessingError> {
     match state {
         ProtocolState::Handshaking => {
-            let packet = process_handshake_packet(&packets);
+            // let packet = process_handshake_packet(&packets);
         }
         ProtocolState::Status => {}
         ProtocolState::Login => {}
@@ -120,17 +121,39 @@ fn process_incoming_packets(
     Ok(todo!() as PacketServerHandshake)
 }
 
-fn process_handshake_packet(
-    packets: &[u8],
-) -> Result<PacketServerHandshake, PacketProcessingError> {
-    let mut cursor = Cursor::new(packets);
+#[derive(Debug, PartialEq)]
+pub(crate) struct ConnectionState {
+    pub(crate) server_state: ProtocolState,
+    pub(crate) client_intent: Option<ClientIntent>,
+}
 
-    let protocol_version = read_var_int(&mut cursor);
-    let strlen_in_bytes = read_var_int(&mut cursor);
-    let server_address = read_string(&mut cursor, strlen_in_bytes as usize)?;
-    let server_port = read_u16_short_be(&mut cursor)?;
-    let intent = read_var_int(&mut cursor);
-    let intent = RequestIntent::try_from(intent)?;
+impl Default for ConnectionState {
+    fn default() -> Self {
+        Self {
+            server_state: ProtocolState::Handshaking,
+            client_intent: None,
+        }
+    }
+}
+
+/// Converts raw bytes from packet into intermediate data types
+/// for server use.
+///
+/// This is done AFTER packet ID has been parsed on SERVERBOUND
+/// direction.
+fn process_handshake_packet(
+    cursor: &mut Cursor<&[u8]>,
+    connection_state: &mut ConnectionState,
+) -> Result<PacketServerHandshake, PacketProcessingError> {
+    let protocol_version = read_var_int(cursor);
+    let strlen_in_bytes = read_var_int(cursor);
+    let server_address = read_string(cursor, strlen_in_bytes as usize)?;
+    let server_port = read_u16_short_be(cursor)?;
+    let intent = read_var_int(cursor);
+    let intent = ClientIntent::try_from(intent)?;
+
+    connection_state.client_intent = Some(intent);
+    connection_state.server_state = ProtocolState::Status;
 
     Ok(PacketServerHandshake {
         protocol_version,
@@ -171,15 +194,28 @@ mod tests {
         packets.write_all(&server_port.to_be_bytes())?;
         write_var_int(intent, &mut packets)?;
 
-        let actual = process_handshake_packet(&packets).unwrap();
+        let mut actual_conn = ConnectionState {
+            server_state: ProtocolState::Handshaking,
+            client_intent: None,
+        };
+
+        let mut cursor = Cursor::new(packets.as_slice());
+
+        let actual = process_handshake_packet(&mut cursor, &mut actual_conn).unwrap();
+
         let expected = PacketServerHandshake {
             protocol_version: 777,
             server_address,
             server_port: 25565,
-            intent: RequestIntent::Status,
+            intent: ClientIntent::Status,
+        };
+        let expected_conn = ConnectionState {
+            server_state: ProtocolState::Status,
+            client_intent: Some(ClientIntent::Status),
         };
 
         assert_eq!(actual, expected);
+        assert_eq!(actual_conn, expected_conn);
         Ok(())
     }
 }
