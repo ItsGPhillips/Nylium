@@ -53,13 +53,123 @@ impl TryFrom<u8> for ServerStatusPacketId {
 }
 
 #[derive(Debug, PartialEq)]
-enum ServerLoginPacket {}
+pub enum ServerLoginPacket {
+    LoginStart,
+    EncryptionResponse,
+    LoginPluginResponse,
+    LoginAcknowledged,
+    CookieResponse,
+}
+
+pub enum ServerLoginPacketId {
+    LoginStart = 0x00,
+    EncryptionResponse = 0x01,
+    LoginPluginResponse = 0x02,
+    LoginAcknowledged = 0x03,
+    CookieResponse = 0x04,
+}
 
 #[derive(Debug, PartialEq)]
-enum ServerConfigPacket {}
+pub enum ServerConfigPacket {
+    ClientInfo,
+    CookieResponse,
+    PluginMessageServerbound,
+    AcknowledgeFinishConfig,
+    KeepAliveServerbound,
+    Pong,
+    ResourcePackResponse,
+    KnownPacksServerbound,
+    CustomClickAction,
+    AcceptCodeOfConduct,
+}
+
+pub enum ServerConfigPacketId {
+    ClientInfo = 0x00,
+    CookieResponse = 0x01,
+    PluginMessageServerbound = 0x02,
+    AcknowledgeFinishConfig = 0x03,
+    KeepAliveServerbound = 0x04,
+    Pong = 0x05,
+    ResourcePackResponse = 0x06,
+    KnownPacksServerbound = 0x07,
+    CustomClickAction = 0x08,
+    AcceptCodeOfConduct = 0x09,
+}
 
 #[derive(Debug, PartialEq)]
-enum ServerPlayPacket {}
+pub enum ServerPlayPacket {}
+
+pub enum ServerPlayPacketId {
+    ConfirmTeleportation = 0x00,
+    Attack = 0x01,
+    QueryBlockEntityTag = 0x02,
+    BundleItemSelected = 0x03,
+    ChangeDifficulty = 0x04,
+    ChangeGameMode = 0x05,
+    AcknowledgeMessage = 0x06,
+    ChatCommand = 0x07,
+    SignedChatCommand = 0x08,
+    ChatMessage = 0x09,
+    PlayerSession = 0x0A,
+    ChunkBatchReceived = 0x0B,
+    ClientStatus = 0x0C,
+    ClientTickEnd = 0x0D,
+    ClientInfo = 0x0E,
+    CommandSuggestionsRequest = 0x0F,
+    AcknowledgeConfig = 0x10,
+    ClickContainerButton = 0x11,
+    ClickContainer = 0x12,
+    CloseContainer = 0x13,
+    ChangeContainerSlotState = 0x14,
+    CookieResponse = 0x15,
+    PluginMessageServerbound = 0x16,
+    DebugSubscriptionRequest = 0x17,
+    EditBook = 0x18,
+    QueryEntityTag = 0x19,
+    Interact = 0x1A,
+    JigsawGenerate = 0x1B,
+    KeepAliveServerbound = 0x1C,
+    LockDifficulty = 0x1D,
+    SetPlayerPosition = 0x1E,
+    SetPlayerPositionAndRotation = 0x1F,
+    SetPlayerRotation = 0x20,
+    SetPlayerMovementFlags = 0x21,
+    MoveVehicleServerbound = 0x22,
+    PaddleBoat = 0x23,
+    PickItemFromBlock = 0x24,
+    PickItemFromEntity = 0x25,
+    PingRequest = 0x26,
+    PlaceRecipe = 0x27,
+    PlayerAbilitiesServerbound = 0x28,
+    PlayerAction = 0x29,
+    PlayerCommand = 0x2A,
+    PlayerInput = 0x2B,
+    PlayerLoaded = 0x2C,
+    Pong = 0x2D,
+    Punch = 0x2E,
+    ChangeRecipeBookSettings = 0x2F,
+    SetSeenRecipe = 0x30,
+    RenameItem = 0x31,
+    ResourcePackResponse = 0x32,
+    SeenAdvancements = 0x33,
+    SelectTrade = 0x34,
+    SetBeaconEffect = 0x35,
+    SetHeldItemServerbound = 0x36,
+    ProgramCommandBlock = 0x37,
+    ProgramCommandBlockMinecart = 0x38,
+    SetCreativeModeSlot = 0x39,
+    SetGameRules = 0x3A,
+    ProgramJigsawBlock = 0x3B,
+    ProgramStructureBlock = 0x3C,
+    SetTestBlock = 0x3D,
+    UpdateSign = 0x3E,
+    SpectatorAction = 0x3F,
+    TeleportToEntity = 0x40,
+    TestInstanceBlockAction = 0x41,
+    UseItemOn = 0x42,
+    UseItem = 0x43,
+    CustomClockAction = 0x44,
+}
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct ConnectionState {
