@@ -31,13 +31,14 @@ pub enum ServerStatusPacket {
     ///
     /// `packet_id`: 0x0
     /// TODO: idempotency on network side? server doesn't respond unless packet is received, before any ping
-    Status,
-    Ping,
+    StatusRequest,
+    PingRequest,
 }
 
+#[repr(u8)]
 pub enum ServerStatusPacketId {
-    Status = 0x00,
-    Ping = 0x01,
+    StatusRequest = 0x00,
+    PingRequest = 0x01,
 }
 
 impl TryFrom<u8> for ServerStatusPacketId {
@@ -45,8 +46,8 @@ impl TryFrom<u8> for ServerStatusPacketId {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0x00 => Ok(Self::Status),
-            0x01 => Ok(Self::Ping),
+            0x00 => Ok(Self::StatusRequest),
+            0x01 => Ok(Self::PingRequest),
             other => Err(other),
         }
     }
@@ -61,6 +62,7 @@ pub enum ServerLoginPacket {
     CookieResponse,
 }
 
+#[repr(u8)]
 pub enum ServerLoginPacketId {
     LoginStart = 0x00,
     EncryptionResponse = 0x01,
@@ -83,6 +85,7 @@ pub enum ServerConfigPacket {
     AcceptCodeOfConduct,
 }
 
+#[repr(u8)]
 pub enum ServerConfigPacketId {
     ClientInfo = 0x00,
     CookieResponse = 0x01,
@@ -99,6 +102,7 @@ pub enum ServerConfigPacketId {
 #[derive(Debug, PartialEq)]
 pub enum ServerPlayPacket {}
 
+#[repr(u8)]
 pub enum ServerPlayPacketId {
     ConfirmTeleportation = 0x00,
     Attack = 0x01,
@@ -212,11 +216,11 @@ fn parse_incoming_packet(
             let packet_id = ServerStatusPacketId::try_from(packet_id)?;
 
             match packet_id {
-                ServerStatusPacketId::Status => {
+                ServerStatusPacketId::StatusRequest => {
                     send_status_response_packet();
-                    Ok(IncomingPacket::Status(ServerStatusPacket::Status))
+                    Ok(IncomingPacket::Status(ServerStatusPacket::StatusRequest))
                 }
-                ServerStatusPacketId::Ping => todo!(),
+                ServerStatusPacketId::PingRequest => todo!(),
             }
         }
         ProtocolState::Login => todo!(),
@@ -333,7 +337,10 @@ mod tests {
 
         let actual = parse_incoming_packet(&packets, &mut connection)?;
 
-        assert_eq!(actual, IncomingPacket::Status(ServerStatusPacket::Status));
+        assert_eq!(
+            actual,
+            IncomingPacket::Status(ServerStatusPacket::StatusRequest)
+        );
 
         // CASE 1: not yet requested but has STATUS request -> accept, send STATUS response
 
