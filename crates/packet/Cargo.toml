@@ -1,0 +1,12 @@
+[package]
+name = "packet"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror.workspace = true
+packet-macros = { path = "macros" }
+
+[dev-dependencies]
+mockall = "0.15.0"
+pretty_assertions.workspace = true
