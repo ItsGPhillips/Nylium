@@ -1,6 +1,6 @@
 use std::io::{self, Cursor, Read};
 
-use crate::packets::PacketProcessingError;
+use crate::packets::PacketParseError;
 
 pub mod string;
 pub mod varint;
@@ -20,13 +20,13 @@ macro_rules! create_cursor_header {
 }
 
 create_cursor_header! {
-    read_u8_byte_be => u8,
+    read_u8_byte => u8,
     read_u16_short_be => u16,
     read_u32_be => u32,
     read_u64_be => u64,
     read_u128_be => u128,
 
-    read_i8_byte_be => i8,
+    read_i8_byte => i8,
     read_i16_short_be => i16,
     read_i32_int_be => i32,
     read_i64_long_be => i64,
@@ -73,14 +73,14 @@ pub enum ClientIntent {
 }
 
 impl TryFrom<i32> for ClientIntent {
-    type Error = PacketProcessingError;
+    type Error = PacketParseError;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(ClientIntent::Status),
             2 => Ok(ClientIntent::Login),
             3 => Ok(ClientIntent::Transfer),
-            _ => Err(PacketProcessingError::InvalidIntent),
+            _ => Err(PacketParseError::InvalidIntent),
         }
     }
 }

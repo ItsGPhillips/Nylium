@@ -6,7 +6,8 @@ use std::{
 use thiserror::Error;
 
 use crate::data_types::{
-    ClientIntent, UShort, read_u16_short_be, string::read_string, varint::read_var_int,
+    ClientIntent, UShort, read_u8_byte, read_u16_short_be, string::read_string,
+    varint::read_var_int,
 };
 
 pub const PROTOCOL_VERSION: i32 = 777;
@@ -65,12 +66,14 @@ struct DecodeError;
 
 #[derive(Error, Debug)]
 #[error("error processing incoming packets")]
-pub enum PacketProcessingError {
+pub enum PacketParseError {
     #[error("failed to process strings")]
     InvalidUTF8(#[from] std::str::Utf8Error),
     Io(#[from] io::Error),
     #[error("failed to process intent from request")]
     InvalidIntent,
+    #[error("packet ID not known by server or unimplemented")]
+    UnknownPacketId,
 }
 
 impl std::fmt::Display for DecodeError {
@@ -79,17 +82,60 @@ impl std::fmt::Display for DecodeError {
     }
 }
 
-enum PacketServerLogin {}
-enum PacketServerConfig {}
-enum PacketServerPlay {}
+impl From<u8> for PacketParseError {
+    fn from(value: u8) -> Self {
+        todo!()
+    }
+}
 
 #[derive(Debug, PartialEq)]
-struct PacketServerHandshake {
+enum IncomingPacket {
+    Handshake(ServerHandshakePacket),
+    Status(ServerStatusPacket),
+    Login(ServerLoginPacket),
+    Config(ServerConfigPacket),
+    Play(ServerPlayPacket),
+}
+
+#[derive(Debug, PartialEq)]
+struct ServerHandshakePacket {
     protocol_version: i32,
     server_address: String,
     server_port: UShort,
     intent: ClientIntent,
 }
+
+#[derive(Debug, PartialEq)]
+enum ServerStatusPacket {
+    Status,
+    Ping,
+}
+
+enum ServerStatusPacketId {
+    Status = 0x00,
+    Ping = 0x01,
+}
+
+impl TryFrom<u8> for ServerStatusPacketId {
+    type Error = u8;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x00 => Ok(Self::Status),
+            0x01 => Ok(Self::Ping),
+            other => Err(other),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum ServerLoginPacket {}
+
+#[derive(Debug, PartialEq)]
+enum ServerConfigPacket {}
+
+#[derive(Debug, PartialEq)]
+enum ServerPlayPacket {}
 
 /// The status can only be requested once, immediately after the
 /// handshake, before any ping. The server won't respond otherwise.
@@ -97,22 +143,6 @@ struct PacketServerHandshake {
 /// `packet_id`: 0x0
 /// TODO: idempotency on network side? server doesn't respond unless packet is received, before any ping
 struct PacketServerStatusRequest;
-
-type PacketID = i16;
-
-// TODO: extract handshake packet ID, then parse payload into intermediate data types
-fn process_packet_id(byte: u8, state: ProtocolState) -> Result<(), PacketProcessingError> {
-    match state {
-        ProtocolState::Handshaking => {
-            // let packet = process_handshake_packet(&packets);
-        }
-        ProtocolState::Status => {}
-        ProtocolState::Login => {}
-        ProtocolState::Configuration => {}
-        ProtocolState::Play => {}
-    }
-    Ok(())
-}
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct ConnectionState {
@@ -129,15 +159,66 @@ impl Default for ConnectionState {
     }
 }
 
+#[allow(clippy::too_many_lines)]
+fn parse_incoming_packet(
+    raw_bytes: &[u8],
+    connection_state: &mut ConnectionState,
+) -> Result<IncomingPacket, PacketParseError> {
+    let ConnectionState {
+        server_state,
+        client_intent,
+    } = connection_state;
+
+    let packet_id = raw_bytes[0];
+    let packet_payload = &raw_bytes[1..];
+    let mut cursor = Cursor::new(packet_payload);
+
+    match server_state {
+        ProtocolState::Handshaking => match packet_id {
+            0x00 => {
+                let data = parse_handshake_packet_payload(&mut cursor, connection_state)?;
+                Ok(IncomingPacket::Handshake(data))
+            }
+            _ => Err(PacketParseError::UnknownPacketId),
+        },
+        ProtocolState::Status => {
+            let packet_id = ServerStatusPacketId::try_from(packet_id)?;
+
+            match packet_id {
+                ServerStatusPacketId::Status => {
+                    send_status_response_packet();
+                    Ok(IncomingPacket::Status(ServerStatusPacket::Status))
+                }
+                ServerStatusPacketId::Ping => todo!(),
+            }
+        }
+        ProtocolState::Login => todo!(),
+        ProtocolState::Configuration => todo!(),
+        ProtocolState::Play => todo!(),
+    }
+}
+
+trait PacketSender {
+    fn send();
+}
+
+struct ServerResponsePacketSender {}
+
+impl PacketSender for ServerResponsePacketSender {
+    fn send() {}
+}
+
+fn send_status_response_packet() {}
+
 /// Converts raw bytes from packet into intermediate data types
 /// for server use.
 ///
 /// This is done AFTER packet ID has been parsed on SERVERBOUND
 /// direction.
-fn process_handshake_packet(
+fn parse_handshake_packet_payload(
     cursor: &mut Cursor<&[u8]>,
     connection_state: &mut ConnectionState,
-) -> Result<PacketServerHandshake, PacketProcessingError> {
+) -> Result<ServerHandshakePacket, PacketParseError> {
     let protocol_version = read_var_int(cursor);
     let strlen_in_bytes = read_var_int(cursor);
     let server_address = read_string(cursor, strlen_in_bytes as usize)?;
@@ -148,15 +229,13 @@ fn process_handshake_packet(
     connection_state.client_intent = Some(intent);
     connection_state.server_state = ProtocolState::Status;
 
-    Ok(PacketServerHandshake {
+    Ok(ServerHandshakePacket {
         protocol_version,
         server_address: String::from(server_address),
         server_port,
         intent,
     })
 }
-
-fn process_status_request_packet() {}
 
 #[cfg(test)]
 mod tests {
@@ -172,9 +251,9 @@ mod tests {
     // 3. ...
     //
     // https://minecraft.wiki/w/Java_Edition_protocol/FAQ#What_does_the_normal_status_ping_sequence_look_like?
-
     #[test]
-    fn packet_handshake_server_should_be_processed() -> Result<(), Box<dyn std::error::Error>> {
+    fn packet_server_handshake_payload_should_be_processed()
+    -> Result<(), Box<dyn std::error::Error>> {
         let server_address = String::from("mc.somewhere.com");
         let server_port: u16 = 25565;
         let intent: i32 = 0x01;
@@ -196,9 +275,9 @@ mod tests {
 
         let mut cursor = Cursor::new(packets.as_slice());
 
-        let actual = process_handshake_packet(&mut cursor, &mut actual_conn).unwrap();
+        let actual = parse_handshake_packet_payload(&mut cursor, &mut actual_conn).unwrap();
 
-        let expected = PacketServerHandshake {
+        let expected = ServerHandshakePacket {
             protocol_version: 777,
             server_address,
             server_port: 25565,
@@ -214,16 +293,31 @@ mod tests {
         Ok(())
     }
 
+    // We're only handling packet processing individually,
+    // not the sequencing yet
+
+    // Status ping sequence - vertical slice
+    // 2. ...
+    // 3. C -> S: Status Request
+    // 4. S -> C: Status Response
+    //
+    // https://minecraft.wiki/w/Java_Edition_protocol/FAQ#What_does_the_normal_status_ping_sequence_look_like?
     #[test]
-    fn packet_status_server_should_be_processed() {
-        let connection = ConnectionState {
+    fn packet_server_status_should_be_processed() -> Result<(), Box<dyn std::error::Error>> {
+        let default_conn = ConnectionState::default();
+
+        // CASE 0: in handshaking state, should not accept STATUS request
+
+        let mut connection = ConnectionState {
             server_state: ProtocolState::Status,
             client_intent: Some(ClientIntent::Status),
         };
 
-        let mut has_status_request = false;
+        let packets: Vec<u8> = vec![0x0];
 
-        // let actual = process_status_request_packet(&mut has_status_request);
+        let actual = parse_incoming_packet(&packets, &mut connection)?;
+
+        assert_eq!(actual, IncomingPacket::Status(ServerStatusPacket::Status));
 
         // CASE 1: not yet requested but has STATUS request -> accept, send STATUS response
 
@@ -232,5 +326,8 @@ mod tests {
         // CASE 3: has been requested, then incoming PING request -> accept, send PONG response
 
         // CASE 4: has not been requested, but incoming PING request -> don't respond
+
+        // CASE 5: has done handshake but incorrect packet ID -> don't respond
+        Ok(())
     }
 }
