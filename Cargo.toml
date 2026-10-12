@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = ["crates/app", "crates/var_int"]
+
+[workspace.dependencies]
+thiserror = "2.0.21"
+pretty_assertions = "1.4.1"
