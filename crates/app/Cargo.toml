@@ -4,11 +4,11 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-thiserror = "2.0.21"
+thiserror.workspace = true
 
 [dev-dependencies]
 mockall = "0.15.0"
-pretty_assertions = "1.4.1"
+pretty_assertions.workspace = true
 
 [lints.clippy]
 pedantic = "warn"
